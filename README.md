@@ -13,7 +13,7 @@ Nacos 配置：
 ```yaml
 server:
   port: 5110
-observe:
+simbank:
   secret: "与 Observe hooks.secret 相同"
 gateway: ... # 从现有服务复制
 rabbitmq: ... # 从 Dispatch 复制，vhost 为 /chat-sms

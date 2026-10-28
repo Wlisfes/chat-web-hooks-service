@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { verifyObserveReceipt, type ObserveReceiptPayload } from '@wlisfes/chat-web-base-schema/observe'
-import { RabbitmqService, SMS_OBSERVE_RECEIPT_ROUTING_KEY, SMS_RECEIPT_EXCHANGE } from '@wlisfes/chat-web-base-schema/rabbitmq'
-import { resolveHooksObserveOptions } from '@/modules/simbank/simbank.constants'
-import { SimbankReceiptDedupe } from '@/modules/simbank/simbank.dedupe'
+import { verifySimbankWebhook, type SimbankWebhookPayload } from '@wlisfes/chat-web-base-schema/observe'
+import { RabbitmqService, SMS_SIMBANK_WEBHOOK_ROUTING_KEY, SMS_SIMBANK_WEBHOOK_EXCHANGE } from '@wlisfes/chat-web-base-schema/rabbitmq'
+import { resolveHooksSimbankOptions } from '@/modules/simbank/simbank.constants'
+import { SimbankWebhookDedupe } from '@/modules/simbank/simbank.dedupe'
 
 /** Observe 回执的请求原文和签名头。 */
 export interface SimbankWebhookRequest {
@@ -28,7 +28,7 @@ const SEND_STATUSES = new Set(['success', 'failed'])
 @Injectable()
 export class SimbankService {
     private readonly logger = new Logger(SimbankService.name)
-    private readonly dedupe = new SimbankReceiptDedupe()
+    private readonly dedupe = new SimbankWebhookDedupe()
 
     constructor(
         private readonly configService: ConfigService,
@@ -42,7 +42,7 @@ export class SimbankService {
         const key = `${receipt.msgId}:${receipt.sendStatus}`
         if (this.dedupe.has(key)) return { msgId: receipt.msgId, duplicate: true }
         try {
-            await this.rabbitmqService.publish(SMS_RECEIPT_EXCHANGE, SMS_OBSERVE_RECEIPT_ROUTING_KEY, receipt, { messageId: key })
+            await this.rabbitmqService.publish(SMS_SIMBANK_WEBHOOK_EXCHANGE, SMS_SIMBANK_WEBHOOK_ROUTING_KEY, receipt, { messageId: key })
         } catch (error) {
             const reason = error instanceof Error ? error.message : String(error)
             this.logger.error(`回执转发失败，等待 Observe 重试：msgId=${receipt.msgId}，原因=${reason}`)
@@ -58,15 +58,15 @@ export class SimbankService {
     private verify({ body, timestamp, signature }: SimbankWebhookRequest): void {
         let secret: string
         try {
-            secret = resolveHooksObserveOptions(this.configService.get('observe')).secret
+            secret = resolveHooksSimbankOptions(this.configService.get('simbank')).secret
         } catch (error) {
             this.logger.error(error instanceof Error ? error.message : String(error))
             throw new ServiceUnavailableException('回执签名未配置')
         }
-        if (!verifyObserveReceipt({ secret, timestamp, signature, body })) throw new UnauthorizedException('回执签名无效或已过期')
+        if (!verifySimbankWebhook({ secret, timestamp, signature, body })) throw new UnauthorizedException('回执签名无效或已过期')
     }
 
-    private parse(body: string): ObserveReceiptPayload {
+    private parse(body: string): SimbankWebhookPayload {
         let value: Record<string, unknown>
         try {
             value = JSON.parse(body) as Record<string, unknown>
@@ -85,8 +85,8 @@ export class SimbankService {
             msgKeyId,
             simbankKeyId,
             portKeyId,
-            sendStatus: value.sendStatus as ObserveReceiptPayload['sendStatus'],
-            statusCode: String(value.statusCode ?? 'UNKNOWN') as ObserveReceiptPayload['statusCode'],
+            sendStatus: value.sendStatus as SimbankWebhookPayload['sendStatus'],
+            statusCode: String(value.statusCode ?? 'UNKNOWN') as SimbankWebhookPayload['statusCode'],
             statusMessage: String(value.statusMessage ?? ''),
             sendTime: typeof value.sendTime === 'string' ? value.sendTime : new Date().toISOString()
         }

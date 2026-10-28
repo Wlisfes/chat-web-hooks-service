@@ -4,7 +4,7 @@ import { APP_GUARD } from '@nestjs/core'
 import { AuthorizationGuard, AuthorizationModule, GatewayPrincipalGuard, GatewayPrincipalModule } from '@wlisfes/chat-web-base-schema/auth'
 import { HttpResponseModule } from '@wlisfes/chat-web-base-schema/interceptor'
 import { forRootNacosRuntimeOptions, NacosModule } from '@wlisfes/chat-web-base-schema/nacos'
-import { RabbitmqModule, setupObserveReceiptTopology } from '@wlisfes/chat-web-base-schema/rabbitmq'
+import { RabbitmqModule, setupSimbankWebhookTopology } from '@wlisfes/chat-web-base-schema/rabbitmq'
 import { AppController } from '@/app.controller'
 import { AppService } from '@/app.service'
 import { HealthModule } from '@/health/health.module'
@@ -17,7 +17,7 @@ import { SimbankModule } from '@/modules/simbank/simbank.module'
         HttpResponseModule,
         ConfigModule.forRoot({ isGlobal: true }),
         NacosModule.forRoot(forRootNacosRuntimeOptions(process.env)),
-        RabbitmqModule.forRoot({ vhost: HOOKS_RABBITMQ_VHOST, setup: setupObserveReceiptTopology }),
+        RabbitmqModule.forRoot({ vhost: HOOKS_RABBITMQ_VHOST, setup: setupSimbankWebhookTopology }),
         GatewayPrincipalModule,
         AuthorizationModule,
         HealthModule,

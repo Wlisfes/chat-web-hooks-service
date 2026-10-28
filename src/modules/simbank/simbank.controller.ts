@@ -1,5 +1,5 @@
 import { HttpCode, Post, Req, type RawBodyRequest } from '@nestjs/common'
-import { OBSERVE_RECEIPT_SIGNATURE_HEADER, OBSERVE_RECEIPT_TIMESTAMP_HEADER } from '@wlisfes/chat-web-base-schema/observe'
+import { SIMBANK_WEBHOOK_SIGNATURE_HEADER, SIMBANK_WEBHOOK_TIMESTAMP_HEADER } from '@wlisfes/chat-web-base-schema/observe'
 import { ApiServiceDecorator, ApifoxController } from '@wlisfes/chat-web-base-schema/decorator'
 import { SimbankService } from '@/modules/simbank/simbank.service'
 import { Public } from '@wlisfes/chat-web-base-schema/auth'
@@ -20,8 +20,8 @@ export class SimbankController {
     public async httpBaseSimbankWebhook(@Req() request: RawBodyRequest<Request>): Promise<SimbankDto.SimbankWebhookResponseDto> {
         return this.simbankService.httpBaseSimbankWebhook({
             body: request.rawBody?.toString('utf8') ?? '',
-            timestamp: request.header(OBSERVE_RECEIPT_TIMESTAMP_HEADER),
-            signature: request.header(OBSERVE_RECEIPT_SIGNATURE_HEADER)
+            timestamp: request.header(SIMBANK_WEBHOOK_TIMESTAMP_HEADER),
+            signature: request.header(SIMBANK_WEBHOOK_SIGNATURE_HEADER)
         })
     }
 }

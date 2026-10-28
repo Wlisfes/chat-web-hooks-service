@@ -79,9 +79,9 @@ server:
   # 容器内 HTTP 监听端口：Observe 回执、健康检查和 Swagger。
   port: 5110
 
-# Observe 回执签名密钥；必须与 Observe Nacos hooks.secret 一致。
-observe:
-  secret: ${scalar(environment.HOOKS_OBSERVE_SECRET?.trim() || require('node:crypto').randomBytes(32).toString('base64url'))}
+# SIMBANK 回执签名密钥；必须与 Observe Nacos hooks.secret 一致。
+simbank:
+  secret: ${scalar(environment.HOOKS_SIMBANK_SECRET?.trim() || require('node:crypto').randomBytes(32).toString('base64url'))}
 
 # 服务间调用与网关身份上下文验签配置；从现有服务复制，必须与 Gateway 保持一致。
 ${gateway}
@@ -93,7 +93,7 @@ ${rabbitmq}
 
 function validateHooksConfig(content) {
     if (!/^\s+port:\s*5110\s*$/m.test(content)) throw new Error('Hooks Nacos 配置缺少 server.port: 5110')
-    if (!/^observe:\n\s+secret:/m.test(content)) throw new Error('Hooks Nacos 配置缺少 observe.secret')
+    if (!/^simbank:\n\s+secret:/m.test(content)) throw new Error('Hooks Nacos 配置缺少 simbank.secret')
     if (!/^rabbitmq:/m.test(content) || !content.includes('/chat-sms')) throw new Error('Hooks Nacos 配置缺少 rabbitmq（vhost /chat-sms）')
     if (!content.includes('service_token:') || !content.includes('secret:')) throw new Error('Hooks Nacos 配置缺少网关凭据')
     return content
@@ -116,7 +116,7 @@ async function main() {
     const created = await ensureHooksConfig()
     process.stdout.write(
         created
-            ? 'Hooks Nacos 配置已创建；请把 observe.secret 复制到 Observe Nacos hooks.secret\n'
+            ? 'Hooks Nacos 配置已创建；请把 simbank.secret 复制到 Observe Nacos hooks.secret\n'
             : 'Hooks Nacos 配置已存在且校验通过\n'
     )
 }

@@ -1,15 +1,15 @@
-import { HOOKS_SIMBANK_RECEIPT_DEDUPE_MAX_SIZE, HOOKS_SIMBANK_RECEIPT_DEDUPE_TTL_MS } from '@/modules/simbank/simbank.constants'
+import { HOOKS_SIMBANK_WEBHOOK_DEDUPE_MAX_SIZE, HOOKS_SIMBANK_WEBHOOK_DEDUPE_TTL_MS } from '@/modules/simbank/simbank.constants'
 
 /**
  * 回执去重：Observe 推送超时重试时，同一回执可能到达多次，窗口内只转发一次。
  * 只在本实例内存，多实例或重启后可能重复转发；Dispatch 写回只更新 submitted 记录，重复回执不会覆盖结果。
  */
-export class SimbankReceiptDedupe {
+export class SimbankWebhookDedupe {
     private readonly entries = new Map<string, number>()
 
     constructor(
-        private readonly ttlMs = HOOKS_SIMBANK_RECEIPT_DEDUPE_TTL_MS,
-        private readonly maxSize = HOOKS_SIMBANK_RECEIPT_DEDUPE_MAX_SIZE,
+        private readonly ttlMs = HOOKS_SIMBANK_WEBHOOK_DEDUPE_TTL_MS,
+        private readonly maxSize = HOOKS_SIMBANK_WEBHOOK_DEDUPE_MAX_SIZE,
         private readonly now: () => number = Date.now
     ) {}
 

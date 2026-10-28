@@ -15,22 +15,25 @@ export class SimbankService {
 
     constructor(private readonly rabbitmqService: RabbitmqService) {}
 
+    /**接收 SIMBANK 设备发送回执**/
     public async httpBaseSimbankWebhook(body: SimbankDto.SimbankWebhookDto): Promise<SimbankDto.SimbankWebhookResponseDto> {
-        const receipt = toPayload(body)
-        const key = `${receipt.msgId}:${receipt.sendStatus}`
-        if (this.dedupe.has(key)) return { msgId: receipt.msgId, duplicate: true }
+        const input = toPayload(body)
+        const key = `${input.msgId}:${input.sendStatus}`
+        if (this.dedupe.has(key)) {
+            return { msgId: input.msgId, duplicate: true }
+        }
         try {
-            await this.rabbitmqService.publish(SMS_SIMBANK_WEBHOOK_EXCHANGE, SMS_SIMBANK_WEBHOOK_ROUTING_KEY, receipt, { messageId: key })
+            await this.rabbitmqService.publish(SMS_SIMBANK_WEBHOOK_EXCHANGE, SMS_SIMBANK_WEBHOOK_ROUTING_KEY, input, { messageId: key })
         } catch (error) {
             const reason = error instanceof Error ? error.message : String(error)
-            this.logger.error(`回执入队失败，等待重试：msgId=${receipt.msgId}，原因=${reason}`)
+            this.logger.error(`回执入队失败，等待重试：msgId=${input.msgId}，原因=${reason}`)
             throw new ServiceUnavailableException('回执入队失败，请稍后重试')
         }
         this.dedupe.add(key)
         this.logger.log(
-            `回执已入队：msgId=${receipt.msgId}，msgKeyId=${receipt.msgKeyId}，portKeyId=${receipt.portKeyId}，sendStatus=${receipt.sendStatus}，statusCode=${receipt.statusCode}`
+            `回执已入队：msgId=${input.msgId}，msgKeyId=${input.msgKeyId}，portKeyId=${input.portKeyId}，sendStatus=${input.sendStatus}，statusCode=${input.statusCode}`
         )
-        return { msgId: receipt.msgId, duplicate: false }
+        return { msgId: input.msgId, duplicate: false }
     }
 }
 

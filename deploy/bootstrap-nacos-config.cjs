@@ -128,15 +128,15 @@ async function ensureHooksConfig(environment = process.env) {
     return true
 }
 
-/** 网关路由：外部经 /api/hooks 访问，网关剥离前缀后转发到 Hooks。 */
+/** 网关路由：/api/observe 去掉前缀后转发到 Hooks 的 /simbank/webhook。 */
 const HOOKS_ROUTE = {
-    id: 'hooks',
-    prefix: '/api/hooks',
+    id: 'observe-webhook',
+    prefix: '/api/observe',
     serviceName: 'chat-web-hooks-service',
     fallbackUrl: 'http://chat-web-hooks-service:5110'
 }
 /** 设备回执开放接口：网关不校验登录态，Hooks 也不校验签名。 */
-const HOOKS_PUBLIC_PATH = '/api/hooks/observe/simbank/webhook'
+const HOOKS_PUBLIC_PATH = '/api/observe/simbank/webhook'
 
 function ensureGatewayRoute(content, route = HOOKS_ROUTE) {
     if (content.includes(`prefix: ${route.prefix}`) || content.includes(`prefix: "${route.prefix}"`)) return content

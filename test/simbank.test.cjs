@@ -91,8 +91,8 @@ test('回执接口开放访问：不需要签名头，DTO 校验必填字段，�
                 headers: { 'content-type': 'application/json' },
                 body: JSON.stringify(body)
             })
-        assert.equal((await post('/observe/simbank/webhook', { msgId: 'm1', sendStatus: 'success', msgKeyId: '99' })).status, 200)
-        assert.equal((await post('/observe/simbank/webhook', { msgId: 'm1', sendStatus: 'submitted' })).status, 400)
+        assert.equal((await post('/simbank/webhook', { msgId: 'm1', sendStatus: 'success', msgKeyId: '99' })).status, 200)
+        assert.equal((await post('/simbank/webhook', { msgId: 'm1', sendStatus: 'submitted' })).status, 400)
         assert.equal((await post('/observe/receipt', { msgId: 'm1', sendStatus: 'success' })).status, 404)
         assert.equal(calls.length, 1)
         assert.equal(calls[0].msgId, 'm1')

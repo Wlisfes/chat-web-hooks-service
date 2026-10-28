@@ -6,7 +6,7 @@ import * as SimbankDto from '@/modules/simbank/simbank.dto'
 
 /**
  * SIMBANK 设备回执开放接口：不校验登录态和签名，只接收回执并入队。
- * 外部经网关访问 /api/hooks/observe/simbank/webhook（网关公开路径），Docker 内的 Observe 直接访问 /observe/simbank/webhook。
+ * 外部和 Observe 都经网关访问 /api/observe/simbank/webhook；网关去掉 /api/observe 后转发到本接口。
  */
 @ApifoxController('回执接收服务-SIMBANK 设备回执')
 export class SimbankController {
@@ -14,7 +14,7 @@ export class SimbankController {
 
     @Public()
     @HttpCode(200)
-    @ApiServiceDecorator(Post('observe/simbank/webhook'), {
+    @ApiServiceDecorator(Post(['simbank/webhook', 'observe/simbank/webhook']), {
         operation: { summary: '接收 SIMBANK 设备发送回执' },
         response: { type: SimbankDto.SimbankWebhookResponseDto, description: '回执已入队或重复回执' }
     })

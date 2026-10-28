@@ -36,10 +36,10 @@ test('来源缺少 rabbitmq 或配置缺少数据库时失败', () => {
     assert.throws(() => validateHooksConfig('server:\n  port: 5110\n'), /rabbitmq/)
 })
 
-test('网关追加 /api/hooks 路由和回执公开路径，重复执行不改动', () => {
+test('网关追加 /api/observe 路由和回执公开路径，重复执行不改动', () => {
     const gateway = '  auth:\n    enabled: true\n    publicPaths:\n      - /health\n  routes:\n    - id: srm\n      prefix: /api/srm\n'
     const updated = ensurePublicPath(ensureGatewayRoute(gateway))
-    assert.match(updated, /- id: hooks\n      prefix: \/api\/hooks\n      serviceName: chat-web-hooks-service/)
-    assert.match(updated, /publicPaths:\n      - \/api\/hooks\/observe\/simbank\/webhook\n/)
+    assert.match(updated, /- id: observe-webhook\n      prefix: \/api\/observe\n      serviceName: chat-web-hooks-service/)
+    assert.match(updated, /publicPaths:\n      - \/api\/observe\/simbank\/webhook\n/)
     assert.equal(ensurePublicPath(ensureGatewayRoute(updated)), updated)
 })

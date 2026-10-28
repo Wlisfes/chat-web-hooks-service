@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import express from 'express'
 import { NestFactory } from '@nestjs/core'
 import { NestExpressApplication } from '@nestjs/platform-express'
 import { setupSwagger } from '@wlisfes/chat-web-base-schema'
@@ -12,9 +13,11 @@ const logger = new ReadableConsoleLogger({
 })
 
 async function bootstrap() {
-    // 回执验签需要请求原文，开启 rawBody 后 req.rawBody 为未解析的 Buffer。
-    const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger, rawBody: true })
+    const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger })
     app.enableShutdownHooks()
+    // 回执验签需要请求原文。setupSwagger 会在 Nest 初始化前注册 express.json()，导致 Nest 的 rawBody 解析器拿不到原文；
+    // 这里最先注册一个保留原文的 JSON 解析器，后续解析器发现请求体已解析会直接跳过。
+    app.use(express.json({ verify: (request, _response, buffer) => ((request as { rawBody?: Buffer }).rawBody = Buffer.from(buffer)) }))
     app.use(requestContextMiddleware)
     app.use(createRequestLoggingMiddleware(process.env.NACOS_SERVICE_NAME))
     return await setupSwagger(app, {

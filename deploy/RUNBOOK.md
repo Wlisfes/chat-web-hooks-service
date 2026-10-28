@@ -13,7 +13,7 @@
 
 ## 职责
 
-Observe 发送完成后 `POST /observe/simbank/webhook` 推送回执，Hooks 校验 HMAC 签名（`x-simbank-webhook-timestamp`、`x-simbank-webhook-signature`）和字段，按 `msgId:sendStatus` 去重后发布到 `chat.sms.simbank.webhook` 队列，由 Dispatch 写回发送记录。Hooks 不写库；发布失败返回 503，Observe 按退避间隔重试。
+Observe 发送完成后 `POST /observe/simbank/webhook` 推送回执，Hooks 不校验签名，按 `msgId:sendStatus` 去重后发布到 `chat.sms.simbank.webhook` 队列，由 Dispatch 写回发送记录。Hooks 校验后把回执推入 `chat.sms.simbank.webhook`，再由本服务串行写回发送状态。发布失败返回 503，Observe 按退避间隔重试。
 
 ## 首次部署前准备
 

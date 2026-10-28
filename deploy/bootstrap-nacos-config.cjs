@@ -69,6 +69,24 @@ function topLevelBlock(content, name) {
     return lines.slice(start, end).join('\n').trimEnd()
 }
 
+function databaseConfig(environment = process.env) {
+    return `database:
+  chat-web-srm:
+    host: ${scalar(environment.HOOKS_MYSQL_HOST?.trim() || 'mysql')}
+    port: ${Number(environment.HOOKS_MYSQL_PORT || 3306)}
+    database: "chat-web-srm"
+    username: ${scalar(environment.HOOKS_MYSQL_USERNAME?.trim() || 'chat_web_hooks_service')}
+    password: ${scalar(required('HOOKS_MYSQL_PASSWORD', environment))}
+    charset: "utf8mb4"
+    timezone: "+08:00"
+`
+}
+
+function withPrefetchOne(rabbitmq) {
+    if (/^\s+prefetch:/m.test(rabbitmq)) return rabbitmq.replace(/prefetch:\s*\d+/, 'prefetch: 1')
+    return `${rabbitmq.trimEnd()}\n  prefetch: 1`
+}
+
 function createHooksConfig(source, environment = process.env) {
     const gateway = topLevelBlock(source, 'gateway')
     const rabbitmq = topLevelBlock(source, 'rabbitmq')
@@ -87,7 +105,8 @@ simbank:
 ${gateway}
 
 # 回执转发到 /chat-sms 虚拟主机的回执队列，由 Dispatch 消费；从 Dispatch 复制。
-${rabbitmq}
+${withPrefetchOne(rabbitmq)}
+${databaseConfig(environment)}
 `
 }
 
@@ -95,6 +114,8 @@ function validateHooksConfig(content) {
     if (!/^\s+port:\s*5110\s*$/m.test(content)) throw new Error('Hooks Nacos 配置缺少 server.port: 5110')
     if (!/^simbank:\n\s+secret:/m.test(content)) throw new Error('Hooks Nacos 配置缺少 simbank.secret')
     if (!/^rabbitmq:/m.test(content) || !content.includes('/chat-sms')) throw new Error('Hooks Nacos 配置缺少 rabbitmq（vhost /chat-sms）')
+    if (!content.includes('chat-web-srm:')) throw new Error('Hooks Nacos 配置缺少 database.chat-web-srm')
+    if (!/prefetch:\s*1\b/.test(content)) throw new Error('Hooks RabbitMQ prefetch 必须为 1，回执要逐条写回')
     if (!content.includes('service_token:') || !content.includes('secret:')) throw new Error('Hooks Nacos 配置缺少网关凭据')
     return content
 }

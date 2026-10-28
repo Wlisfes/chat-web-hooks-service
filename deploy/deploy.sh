@@ -32,9 +32,15 @@ until docker pull "$IMAGE"; do
     attempt=$((attempt + 1))
 done
 
-# 部署前准备 Nacos 配置；已有配置只校验，不覆盖人工修改。Hooks 不连接数据库。
+# 部署前授权写回发送记录，并准备 Nacos 配置。已有配置只校验，不覆盖人工修改。
 script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+export HOOKS_MYSQL_PASSWORD_FILE="$script_dir/.hooks-mysql-password"
+sh "$script_dir/bootstrap-database.sh"
+HOOKS_MYSQL_PASSWORD=$(tr -d '\r\n' < "$HOOKS_MYSQL_PASSWORD_FILE")
+export HOOKS_MYSQL_PASSWORD
+export HOOKS_MYSQL_USERNAME=${HOOKS_MYSQL_USERNAME:-chat_web_hooks_service}
 docker run --rm --network host --env-file .env \
+    -e HOOKS_MYSQL_PASSWORD -e HOOKS_MYSQL_USERNAME \
     -v "$script_dir/bootstrap-nacos-config.cjs:/app/bootstrap-nacos-config.cjs:ro" \
     -w /app node:22-alpine node bootstrap-nacos-config.cjs
 

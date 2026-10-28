@@ -3,12 +3,22 @@ const assert = require('node:assert/strict')
 const { HealthService } = require('../dist/health/health.service')
 const { AppService } = require('../dist/app.service')
 
-test('RabbitMQ 未就绪时就绪检查返回 DOWN', async () => {
-    const down = await new HealthService({ isReady: () => false }).getReadiness()
-    assert.equal(down.status, 'DOWN')
-    const up = await new HealthService({ isReady: () => true }).getReadiness()
-    assert.equal(up.status, 'UP')
-    assert.equal((await new HealthService({}).getLiveness()).status, 'UP')
+function health(rabbitmqReady, databaseReady = true) {
+    return new HealthService(
+        { isReady: () => rabbitmqReady },
+        {
+            isInitialized: databaseReady,
+            entityMetadatas: databaseReady ? [{ tableName: 'tb_srm_simbank_message' }] : [],
+            query: async () => (databaseReady ? [{ tableName: 'tb_srm_simbank_message' }] : [])
+        }
+    )
+}
+
+test('RabbitMQ 或数据库未就绪时就绪检查返回 DOWN', async () => {
+    assert.equal((await health(false).getReadiness()).status, 'DOWN')
+    assert.equal((await health(true, false).getReadiness()).status, 'DOWN')
+    assert.equal((await health(true).getReadiness()).status, 'UP')
+    assert.equal((await health(true).getLiveness()).status, 'UP')
 })
 
 test('服务信息返回回执接收服务名称', async () => {

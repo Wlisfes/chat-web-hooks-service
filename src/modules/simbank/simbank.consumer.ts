@@ -18,7 +18,9 @@ export class SimbankWebhookConsumer implements OnApplicationBootstrap {
     ) {}
 
     public async onApplicationBootstrap(): Promise<void> {
-        await this.rabbitmqService.consume<SimbankWebhookPayload>(SMS_SIMBANK_WEBHOOK_QUEUE, async receipt => this.fetchWebhook(receipt))
+        await this.rabbitmqService.consume<SimbankWebhookPayload>(SMS_SIMBANK_WEBHOOK_QUEUE, async receipt => {
+            return this.fetchWebhook(receipt)
+        })
         this.logger.log(`已订阅回执队列，串行写回发送状态：${SMS_SIMBANK_WEBHOOK_QUEUE}`)
     }
 

@@ -167,7 +167,7 @@ test('写回只更新 submitted 记录，成功时补预付并记后付', async 
         sendTime: '2026-10-28T02:00:00.000Z'
     })
     assert.equal(saved, 'ack')
-    assert.equal(where.params.submitted, 'submitted')
+    assert.deepEqual(where.params.fromStatuses, ['submitted'])
     assert.equal(where.params.msgId, 'm1')
     assert.equal(setValues.sendStatus, 'success')
     assert.deepEqual(
@@ -182,4 +182,33 @@ test('无法定位的回执直接丢弃，不写库', async () => {
     const dataSource = { transaction: async () => ((called = true), false) }
     assert.equal(await new SimbankStatusService(dataSource, {}).apply({ msgId: 'm1' }), 'ack')
     assert.equal(called, false)
+})
+
+test('送达回执可以覆盖 submitted 或 success，不计费', async () => {
+    const { SimbankStatusService } = require('../dist/modules/simbank/simbank.status')
+    let where
+    let added = 0
+    const dataSource = {
+        transaction: async work => work(dataSource),
+        createQueryBuilder: () => {
+            const builder = {
+                update: () => builder,
+                set: () => builder,
+                where: (sql, params) => ((where = { sql, params }), builder),
+                updateEntity: () => builder,
+                execute: async () => ({ affected: 1 })
+            }
+            return builder
+        }
+    }
+    const outbox = { add: async () => added++, flush: async () => {} }
+    await new SimbankStatusService(dataSource, outbox).apply({
+        msgId: 'm1',
+        msgKeyId: 99,
+        sendStatus: 'delivered',
+        statusCode: 'DELIVERED',
+        sendTime: '2026-10-28T03:00:00.000Z'
+    })
+    assert.deepEqual(where.params.fromStatuses, ['submitted', 'success'])
+    assert.equal(added, 0)
 })

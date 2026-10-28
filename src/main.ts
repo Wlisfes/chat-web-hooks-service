@@ -15,7 +15,7 @@ async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger })
     app.enableShutdownHooks()
     app.use(requestContextMiddleware)
-    app.use(createRequestLoggingMiddleware(process.env.NACOS_SERVICE_NAME))
+    // app.use(createRequestLoggingMiddleware(process.env.NACOS_SERVICE_NAME))
     return await setupSwagger(app, {
         title: 'Chat Web Hooks 服务 API',
         description: '回执接收服务：接收设备侧发送回执并转发到消息队列',

@@ -10,9 +10,13 @@ export class SimbankWebhookDto {
     @MaxLength(36, { message: '短信ID长度不能超过36位' })
     msgId: string
 
-    @ApiProperty({ description: '发送结果：success=发送成功，failed=发送失败', enum: ['success', 'failed'], example: 'success' })
-    @IsIn(['success', 'failed'], { message: 'sendStatus 必须是 success 或 failed' })
-    sendStatus: 'success' | 'failed'
+    @ApiProperty({
+        description: '发送结果：success=发送成功，failed=发送失败，delivered=已送达',
+        enum: ['success', 'failed', 'delivered'],
+        example: 'success'
+    })
+    @IsIn(['success', 'failed', 'delivered'], { message: 'sendStatus 必须是 success、failed 或 delivered' })
+    sendStatus: 'success' | 'failed' | 'delivered'
 
     @ApiProperty({ description: '发送记录主键：tb_srm_simbank_message.key_id', example: 1001, required: false })
     @IsOptional()

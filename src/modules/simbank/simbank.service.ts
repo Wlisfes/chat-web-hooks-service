@@ -17,7 +17,7 @@ export class SimbankService {
 
     /**接收 SIMBANK 设备发送回执**/
     public async httpBaseSimbankWebhook(body: SimbankDto.SimbankWebhookDto): Promise<SimbankDto.SimbankWebhookResponseDto> {
-        const input = toPayload(body)
+        const input = this.toPayload(body)
         const key = `${input.msgId}:${input.sendStatus}`
         if (this.dedupe.has(key)) {
             return { msgId: input.msgId, duplicate: true }
@@ -30,23 +30,20 @@ export class SimbankService {
             throw new ServiceUnavailableException('回执入队失败，请稍后重试')
         }
         this.dedupe.add(key)
-        this.logger.log(
-            `回执已入队：msgId=${input.msgId}，msgKeyId=${input.msgKeyId}，portKeyId=${input.portKeyId}，sendStatus=${input.sendStatus}，statusCode=${input.statusCode}`
-        )
         return { msgId: input.msgId, duplicate: false }
     }
-}
 
-/** DTO 转为回执队列消息：缺省的定位字段记为 0，写回时按 msgId + msgKeyId 定位，缺失则丢弃。 */
-function toPayload(body: SimbankDto.SimbankWebhookDto): SimbankWebhookPayload {
-    return {
-        msgId: body.msgId.trim(),
-        msgKeyId: body.msgKeyId ?? 0,
-        simbankKeyId: body.simbankKeyId ?? 0,
-        portKeyId: body.portKeyId ?? 0,
-        sendStatus: body.sendStatus,
-        statusCode: (body.statusCode ?? 'UNKNOWN') as SimbankWebhookPayload['statusCode'],
-        statusMessage: body.statusMessage ?? '',
-        sendTime: body.sendTime ?? new Date().toISOString()
+    /** DTO 转为回执队列消息：缺省的定位字段记为 0，写回时按 msgId + msgKeyId 定位，缺失则丢弃。 */
+    public toPayload(body: SimbankDto.SimbankWebhookDto): SimbankWebhookPayload {
+        return {
+            msgId: body.msgId.trim(),
+            msgKeyId: body.msgKeyId ?? 0,
+            simbankKeyId: body.simbankKeyId ?? 0,
+            portKeyId: body.portKeyId ?? 0,
+            sendStatus: body.sendStatus as SimbankWebhookPayload['sendStatus'],
+            statusCode: (body.statusCode ?? 'UNKNOWN') as SimbankWebhookPayload['statusCode'],
+            statusMessage: body.statusMessage ?? '',
+            sendTime: body.sendTime ?? new Date().toISOString()
+        }
     }
 }

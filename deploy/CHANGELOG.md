@@ -1,5 +1,11 @@
 # Hooks 部署变更记录
 
+## 2026-10-28：回执接口改为 /observe/simbank/webhook
+
+- 变更内容：回执模块改名为 simbank，接口路径从 `POST /observe/receipt` 改为 `POST /observe/simbank/webhook`，旧路径移除。
+- 机器侧操作：部署 Hooks 前后把 Observe Nacos `hooks.url` 改为 `http://chat-web-hooks-service:5110/observe/simbank/webhook`，修改后立即生效。切换间隙推送失败的回执由 Observe 退避重试，重试用完由 Dispatch 回执超时检查补偿。
+- 回滚方法：回退 Hooks 镜像，并把 Nacos `hooks.url` 改回 `/observe/receipt`。
+
 ## 2026-10-28：新增回执接收服务
 
 - 影响机器：`chat-home-server`。

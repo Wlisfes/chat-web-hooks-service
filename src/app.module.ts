@@ -8,8 +8,8 @@ import { RabbitmqModule, setupObserveReceiptTopology } from '@wlisfes/chat-web-b
 import { AppController } from '@/app.controller'
 import { AppService } from '@/app.service'
 import { HealthModule } from '@/health/health.module'
-import { HOOKS_RABBITMQ_VHOST } from '@/modules/receipt/receipt.constants'
-import { ReceiptModule } from '@/modules/receipt/receipt.module'
+import { HOOKS_RABBITMQ_VHOST } from '@/modules/simbank/simbank.constants'
+import { SimbankModule } from '@/modules/simbank/simbank.module'
 
 /** 回执接收服务：接收 Observe 等设备侧的发送回执，校验签名、去重后转发到回执队列。不连接数据库。 */
 @Module({
@@ -21,7 +21,7 @@ import { ReceiptModule } from '@/modules/receipt/receipt.module'
         GatewayPrincipalModule,
         AuthorizationModule,
         HealthModule,
-        ReceiptModule
+        SimbankModule
     ],
     controllers: [AppController],
     providers: [

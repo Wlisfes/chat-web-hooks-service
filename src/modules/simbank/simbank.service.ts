@@ -2,18 +2,18 @@ import { BadRequestException, Injectable, Logger, ServiceUnavailableException, U
 import { ConfigService } from '@nestjs/config'
 import { verifyObserveReceipt, type ObserveReceiptPayload } from '@wlisfes/chat-web-base-schema/observe'
 import { RabbitmqService, SMS_OBSERVE_RECEIPT_ROUTING_KEY, SMS_RECEIPT_EXCHANGE } from '@wlisfes/chat-web-base-schema/rabbitmq'
-import { resolveHooksObserveOptions } from '@/modules/receipt/receipt.constants'
-import { ReceiptDedupe } from '@/modules/receipt/receipt.dedupe'
+import { resolveHooksObserveOptions } from '@/modules/simbank/simbank.constants'
+import { SimbankReceiptDedupe } from '@/modules/simbank/simbank.dedupe'
 
 /** Observe 回执的请求原文和签名头。 */
-export interface ObserveReceiptRequest {
+export interface SimbankWebhookRequest {
     body: string
     timestamp?: string
     signature?: string
 }
 
 /** 回执受理结果。 */
-export interface ReceiptAcceptResult {
+export interface SimbankWebhookResult {
     msgId: string
     /** true 表示去重窗口内已转发过，本次没有重复转发。 */
     duplicate: boolean
@@ -26,16 +26,16 @@ const SEND_STATUSES = new Set(['success', 'failed'])
  * Hooks 不连接数据库，只做校验和转发；发布失败返回 503，Observe 会按退避间隔重试。
  */
 @Injectable()
-export class ReceiptService {
-    private readonly logger = new Logger(ReceiptService.name)
-    private readonly dedupe = new ReceiptDedupe()
+export class SimbankService {
+    private readonly logger = new Logger(SimbankService.name)
+    private readonly dedupe = new SimbankReceiptDedupe()
 
     constructor(
         private readonly configService: ConfigService,
         private readonly rabbitmqService: RabbitmqService
     ) {}
 
-    public async acceptObserveReceipt(request: ObserveReceiptRequest): Promise<ReceiptAcceptResult> {
+    public async httpBaseSimbankWebhook(request: SimbankWebhookRequest): Promise<SimbankWebhookResult> {
         this.verify(request)
         const receipt = this.parse(request.body)
         // 同一短信只会有一个最终结果，按短信ID + 结果去重。
@@ -55,7 +55,7 @@ export class ReceiptService {
         return { msgId: receipt.msgId, duplicate: false }
     }
 
-    private verify({ body, timestamp, signature }: ObserveReceiptRequest): void {
+    private verify({ body, timestamp, signature }: SimbankWebhookRequest): void {
         let secret: string
         try {
             secret = resolveHooksObserveOptions(this.configService.get('observe')).secret

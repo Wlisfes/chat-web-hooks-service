@@ -1,6 +1,6 @@
 {
     "name": "chat-web-hooks-service",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Chat Web Hooks 回执接收服务",
     "author": "Wlisfes",
     "private": true,
@@ -37,7 +37,8 @@
         "js-yaml": "4.1.0",
         "nacos": "2.6.0",
         "reflect-metadata": "0.2.2",
-        "rxjs": "7.8.2"
+        "rxjs": "7.8.2",
+        "typeorm": "0.3.31"
     },
     "devDependencies": {
         "@nestjs/cli": "11.0.24",

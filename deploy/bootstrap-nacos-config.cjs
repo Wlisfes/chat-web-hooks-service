@@ -1,6 +1,6 @@
 'use strict'
 
-/** 部署前准备 Hooks Nacos 配置。已有配置只校验，不覆盖人工修改；回执入口只在 Docker 网络内供 Observe 调用，不追加网关路由。 */
+/** 部署前准备 Hooks Nacos 配置，并给网关追加 /api/hooks 路由和回执公开路径。已有配置只校验，不覆盖人工修改。 */
 
 function required(name, environment = process.env) {
     const value = environment[name]
@@ -69,6 +69,24 @@ function topLevelBlock(content, name) {
     return lines.slice(start, end).join('\n').trimEnd()
 }
 
+function databaseConfig(environment = process.env) {
+    return `database:
+  chat-web-srm:
+    host: ${scalar(environment.HOOKS_MYSQL_HOST?.trim() || 'mysql')}
+    port: ${Number(environment.HOOKS_MYSQL_PORT || 3306)}
+    database: "chat-web-srm"
+    username: ${scalar(environment.HOOKS_MYSQL_USERNAME?.trim() || 'chat_web_hooks_service')}
+    password: ${scalar(required('HOOKS_MYSQL_PASSWORD', environment))}
+    charset: "utf8mb4"
+    timezone: "+08:00"
+`
+}
+
+function withPrefetchOne(rabbitmq) {
+    if (/^\s+prefetch:/m.test(rabbitmq)) return rabbitmq.replace(/prefetch:\s*\d+/, 'prefetch: 1')
+    return `${rabbitmq.trimEnd()}\n  prefetch: 1`
+}
+
 function createHooksConfig(source, environment = process.env) {
     const gateway = topLevelBlock(source, 'gateway')
     const rabbitmq = topLevelBlock(source, 'rabbitmq')
@@ -76,25 +94,23 @@ function createHooksConfig(source, environment = process.env) {
     if (!/vhost:\s*"?\/chat-sms"?/.test(rabbitmq)) throw new Error('来源 RabbitMQ 配置 vhost 必须为 /chat-sms')
     return `# 服务监听配置。
 server:
-  # 容器内 HTTP 监听端口：Observe 回执、健康检查和 Swagger。
+  # 容器内 HTTP 监听端口：设备回执、健康检查和 Swagger。
   port: 5110
-
-# Observe 回执签名密钥；必须与 Observe Nacos hooks.secret 一致。
-observe:
-  secret: ${scalar(environment.HOOKS_OBSERVE_SECRET?.trim() || require('node:crypto').randomBytes(32).toString('base64url'))}
 
 # 服务间调用与网关身份上下文验签配置；从现有服务复制，必须与 Gateway 保持一致。
 ${gateway}
 
 # 回执转发到 /chat-sms 虚拟主机的回执队列，由 Dispatch 消费；从 Dispatch 复制。
-${rabbitmq}
+${withPrefetchOne(rabbitmq)}
+${databaseConfig(environment)}
 `
 }
 
 function validateHooksConfig(content) {
     if (!/^\s+port:\s*5110\s*$/m.test(content)) throw new Error('Hooks Nacos 配置缺少 server.port: 5110')
-    if (!/^observe:\n\s+secret:/m.test(content)) throw new Error('Hooks Nacos 配置缺少 observe.secret')
     if (!/^rabbitmq:/m.test(content) || !content.includes('/chat-sms')) throw new Error('Hooks Nacos 配置缺少 rabbitmq（vhost /chat-sms）')
+    if (!content.includes('chat-web-srm:')) throw new Error('Hooks Nacos 配置缺少 database.chat-web-srm')
+    if (!/prefetch:\s*1\b/.test(content)) throw new Error('Hooks RabbitMQ prefetch 必须为 1，回执要逐条写回')
     if (!content.includes('service_token:') || !content.includes('secret:')) throw new Error('Hooks Nacos 配置缺少网关凭据')
     return content
 }
@@ -112,13 +128,57 @@ async function ensureHooksConfig(environment = process.env) {
     return true
 }
 
+/** 网关路由：/api/observe 去掉前缀后转发到 Hooks 的 /simbank/webhook。 */
+const HOOKS_ROUTE = {
+    id: 'observe-webhook',
+    prefix: '/api/observe',
+    serviceName: 'chat-web-hooks-service',
+    fallbackUrl: 'http://chat-web-hooks-service:5110'
+}
+/** 设备回执开放接口：网关不校验登录态，Hooks 也不校验签名。 */
+const HOOKS_PUBLIC_PATH = '/api/observe/simbank/webhook'
+
+function ensureGatewayRoute(content, route = HOOKS_ROUTE) {
+    if (content.includes(`prefix: ${route.prefix}`) || content.includes(`prefix: "${route.prefix}"`)) return content
+    const block = [
+        `    - id: ${route.id}`,
+        `      prefix: ${route.prefix}`,
+        `      serviceName: ${route.serviceName}`,
+        `      fallbackUrl: ${route.fallbackUrl}`,
+        '      fallbackEnabled: false',
+        '      enabled: true',
+        ''
+    ].join('\n')
+    const marker = '    - id: srm\n'
+    if (content.includes(marker)) return content.replace(marker, `${block}${marker}`)
+    const routesAt = content.indexOf('  routes:\n')
+    if (routesAt < 0) throw new Error(`网关配置缺少 routes，无法追加 ${route.prefix}`)
+    const insertAt = routesAt + '  routes:\n'.length
+    return `${content.slice(0, insertAt)}${block}${content.slice(insertAt)}`
+}
+
+function ensurePublicPath(content, path = HOOKS_PUBLIC_PATH) {
+    if (new RegExp(`^\\s+- ${path.replace(/[/.]/g, '\\$&')}\\s*$`, 'm').test(content)) return content
+    const header = '    publicPaths:\n'
+    const at = content.indexOf(header)
+    if (at < 0) throw new Error('网关配置缺少 gateway.auth.publicPaths，无法追加 Hooks 公开路径')
+    const insertAt = at + header.length
+    return `${content.slice(0, insertAt)}      - ${path}\n${content.slice(insertAt)}`
+}
+
+async function ensureGatewayConfig(environment = process.env) {
+    for (const dataId of ['chat-web-gateway-service.yaml', 'chat-web-gateway-service-development.yaml']) {
+        const existing = await readConfig(dataId, environment)
+        if (!existing) continue
+        const updated = ensurePublicPath(ensureGatewayRoute(existing))
+        if (updated !== existing) await writeConfig(dataId, updated, environment)
+    }
+}
+
 async function main() {
     const created = await ensureHooksConfig()
-    process.stdout.write(
-        created
-            ? 'Hooks Nacos 配置已创建；请把 observe.secret 复制到 Observe Nacos hooks.secret\n'
-            : 'Hooks Nacos 配置已存在且校验通过\n'
-    )
+    await ensureGatewayConfig()
+    process.stdout.write(created ? 'Hooks Nacos 配置已创建，网关路由已检查\n' : 'Hooks Nacos 配置已存在且校验通过，网关路由已检查\n')
 }
 
 if (require.main === module) {
@@ -128,4 +188,4 @@ if (require.main === module) {
     })
 }
 
-module.exports = { createHooksConfig, validateHooksConfig }
+module.exports = { createHooksConfig, validateHooksConfig, ensureGatewayRoute, ensurePublicPath, HOOKS_PUBLIC_PATH }

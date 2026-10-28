@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { createHooksConfig, validateHooksConfig } = require('../deploy/bootstrap-nacos-config.cjs')
+const { createHooksConfig, validateHooksConfig, ensureGatewayRoute, ensurePublicPath } = require('../deploy/bootstrap-nacos-config.cjs')
 
 const source = `server:
   port: 5080
@@ -19,17 +19,27 @@ redis:
   host: chat-web-redis
 `
 
-test('Hooks Nacos 配置包含 5110、回执签名密钥和 /chat-sms RabbitMQ，不包含数据库和 Redis', () => {
-    const content = createHooksConfig(source, { HOOKS_OBSERVE_SECRET: 'hooks-secret' })
+test('Hooks Nacos 配置包含 5110 和 /chat-sms RabbitMQ，包含 SRM 库连接和 prefetch 1，不包含回执密钥和 Redis', () => {
+    const content = createHooksConfig(source, { HOOKS_MYSQL_PASSWORD: 'db-pass' })
     validateHooksConfig(content)
     assert.match(content, /port: 5110/)
-    assert.match(content, /observe:\n  secret: "hooks-secret"/)
+    assert.doesNotMatch(content, /^simbank:/m)
     assert.match(content, /vhost: \/chat-sms/)
-    assert.doesNotMatch(content, /redis:|database:/)
-    assert.match(createHooksConfig(source, {}), /observe:\n  secret: "[A-Za-z0-9_-]{20,}"/, '未提供密钥时随机生成')
+    assert.match(content, /prefetch: 1/)
+    assert.match(content, /username: "chat_web_hooks_service"/)
+    assert.doesNotMatch(content, /redis:/)
+    assert.match(content, /database: "chat-web-srm"/)
 })
 
-test('来源缺少 rabbitmq 或配置缺少密钥时失败', () => {
+test('来源缺少 rabbitmq 或配置缺少数据库时失败', () => {
     assert.throws(() => createHooksConfig('gateway:\n  a: 1\n', {}), /rabbitmq/)
-    assert.throws(() => validateHooksConfig('server:\n  port: 5110\n'), /observe\.secret/)
+    assert.throws(() => validateHooksConfig('server:\n  port: 5110\n'), /rabbitmq/)
+})
+
+test('网关追加 /api/observe 路由和回执公开路径，重复执行不改动', () => {
+    const gateway = '  auth:\n    enabled: true\n    publicPaths:\n      - /health\n  routes:\n    - id: srm\n      prefix: /api/srm\n'
+    const updated = ensurePublicPath(ensureGatewayRoute(gateway))
+    assert.match(updated, /- id: observe-webhook\n      prefix: \/api\/observe\n      serviceName: chat-web-hooks-service/)
+    assert.match(updated, /publicPaths:\n      - \/api\/observe\/simbank\/webhook\n/)
+    assert.equal(ensurePublicPath(ensureGatewayRoute(updated)), updated)
 })

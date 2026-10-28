@@ -13,6 +13,15 @@ export class ServiceLivenessResponseDto {
 export class ServiceDependencyResponseDto {
     @ApiProperty({ description: '依赖是否连接成功', example: true })
     connected: boolean
+
+    @ApiProperty({ description: '必需数据表数量', required: false, example: 2 })
+    requiredTableCount?: number
+
+    @ApiProperty({ description: '缺失的数据表', type: [String], required: false, example: [] })
+    missingTables?: string[]
+
+    @ApiProperty({ description: '检查失败原因', required: false, example: '连接超时' })
+    error?: string
 }
 
 /** 鉴权模式结构。 */
@@ -31,6 +40,9 @@ export class ServiceReadinessResponseDto {
 
     @ApiProperty({ description: 'RabbitMQ 状态', type: ServiceDependencyResponseDto })
     rabbitmq: ServiceDependencyResponseDto
+
+    @ApiProperty({ description: '数据库状态', type: ServiceDependencyResponseDto })
+    database: ServiceDependencyResponseDto
 
     @ApiProperty({ description: '鉴权模式', type: ServiceAuthModeResponseDto })
     auth: ServiceAuthModeResponseDto

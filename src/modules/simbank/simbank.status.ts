@@ -28,7 +28,7 @@ type ReceiptSendStatus = keyof typeof RECEIPT_SEND_STATUS
 /**
  * 按回执写回发送状态。
  * success、failed 只更新仍为 submitted 的记录；delivered 可以晚到，允许从 submitted 或 success 写成已送达，不覆盖失败结果。
- * 计费只发生在首次离开 submitted 时：预付补写受理计费，后付在 success 时计费。delivered 不再计费。
+ * 发送成功或已送达时各发一次扣费事件，eventId 用短信ID，Charge 按短信只扣一次。失败不扣费。
  */
 @Injectable()
 export class SimbankStatusService {
@@ -90,18 +90,17 @@ export class SimbankStatusService {
                 .updateEntity(false)
                 .execute()
             if (!result.affected) return false
-            if (outcome.sendStatus === SrmSchema.TbSrmSimbankMessageSendStatus.DELIVERED) return true
+            if (
+                outcome.sendStatus !== SrmSchema.TbSrmSimbankMessageSendStatus.SUCCESS &&
+                outcome.sendStatus !== SrmSchema.TbSrmSimbankMessageSendStatus.DELIVERED
+            ) {
+                return true
+            }
             const snapshot = await manager
                 .getRepository(SrmSchema.TbSrmSimbankMessage)
                 .findOne({ where: { keyId }, select: BILLING_SELECT })
             if (!snapshot) return true
-            await this.billingOutbox.add(
-                manager,
-                createSrmUserBilling(snapshot, SrmSchema.TbSrmSimbankMessageSendStatus.SUBMITTED, outcome.sendTime)
-            )
-            if (outcome.sendStatus === SrmSchema.TbSrmSimbankMessageSendStatus.SUCCESS) {
-                await this.billingOutbox.add(manager, createSrmUserBilling(snapshot, outcome.sendStatus, outcome.sendTime))
-            }
+            await this.billingOutbox.add(manager, createSrmUserBilling(snapshot, outcome.sendStatus, outcome.sendTime))
             return true
         })
         if (saved) void this.billingOutbox.flush()

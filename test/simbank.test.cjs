@@ -172,7 +172,7 @@ test('写回只更新 submitted 记录，成功时补预付并记后付', async 
     assert.equal(setValues.sendStatus, 'success')
     assert.deepEqual(
         added.map(item => item.eventId),
-        ['m1:success']
+        ['m1']
     )
 })
 
@@ -184,12 +184,13 @@ test('无法定位的回执直接丢弃，不写库', async () => {
     assert.equal(called, false)
 })
 
-test('送达回执可以覆盖 submitted 或 success，不计费', async () => {
+test('送达回执可以覆盖 submitted 或 success，并提交一次扣费', async () => {
     const { SimbankStatusService } = require('../dist/modules/simbank/simbank.status')
     let where
     let added = 0
     const dataSource = {
         transaction: async work => work(dataSource),
+        getRepository: () => ({ findOne: async () => ({ keyId: 99, msgId: 'm1', userKeyId: 1, payMode: 'postpaid', segments: 1, cost: 10, simbankKeyId: 2, portKeyId: 3 }) }),
         createQueryBuilder: () => {
             const builder = {
                 update: () => builder,
@@ -210,5 +211,5 @@ test('送达回执可以覆盖 submitted 或 success，不计费', async () => {
         sendTime: '2026-10-28T03:00:00.000Z'
     })
     assert.deepEqual(where.params.fromStatuses, ['submitted', 'success'])
-    assert.equal(added, 0)
+    assert.equal(added, 1)
 })

@@ -190,7 +190,18 @@ test('送达回执可以覆盖 submitted 或 success，并提交一次扣费', a
     let added = 0
     const dataSource = {
         transaction: async work => work(dataSource),
-        getRepository: () => ({ findOne: async () => ({ keyId: 99, msgId: 'm1', userKeyId: 1, payMode: 'postpaid', segments: 1, cost: 10, simbankKeyId: 2, portKeyId: 3 }) }),
+        getRepository: () => ({
+            findOne: async () => ({
+                keyId: 99,
+                msgId: 'm1',
+                userKeyId: 1,
+                payMode: 'postpaid',
+                segments: 1,
+                cost: 10,
+                simbankKeyId: 2,
+                portKeyId: 3
+            })
+        }),
         createQueryBuilder: () => {
             const builder = {
                 update: () => builder,

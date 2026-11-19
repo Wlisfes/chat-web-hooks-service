@@ -1,6 +1,8 @@
 # chat-web-hooks-service
 
-回执接收服务。Observe 发送完成后通过 HTTP 推送回执，Hooks 校验签名、去重后转发到 RabbitMQ 回执队列，由 Dispatch 写回发送记录。Hooks 不连接数据库。
+回执接收服务。接收 SIMBANK 设备和 Observe 的发送回执，去重后写入 RabbitMQ，再由本服务串行写回 SRM 发送状态，并带上供应商计费事件。对外接口是 `POST /simbank/webhook` 和 `POST /observe/simbank/webhook`，经网关前缀 `/api/observe` 访问。Hooks 连接 `chat-web-srm`，读写发送记录和计费发件箱，不建表。
+
+操作日志也由本服务消费。各服务入口把日志发到 `/chat-sms` 的 `chat.skyline.logger` 队列，Hooks 解析菜单后写入 Skyline 库的 `tb_skyline_logger`。Nacos 需要额外配置 `database.chat-web-skyline`，Hooks 不建这张表。入库失败的消息进入 `chat.skyline.logger.dead`。
 
 | 项目          | 生产（Docker）                | 本地开发                                  |
 | ------------- | ----------------------------- | ----------------------------------------- |

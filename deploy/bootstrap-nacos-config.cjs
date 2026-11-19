@@ -82,6 +82,33 @@ function databaseConfig(environment = process.env) {
 `
 }
 
+/** 从 Skyline 配置取出数据库连接，供 Hooks 写操作日志。不输出密码。 */
+function skylineDatabaseBlock(source) {
+    const database = topLevelBlock(source, 'database')
+    if (!database) throw new Error('Skyline Nacos 配置缺少 database.chat-web-skyline')
+    const lines = database.split('\n')
+    const start = lines.findIndex(line => line.trim() === 'chat-web-skyline:')
+    if (start < 0) throw new Error('Skyline Nacos 配置缺少 database.chat-web-skyline')
+    const block = [`  chat-web-skyline:`]
+    for (const line of lines.slice(start + 1)) {
+        if (line.trim() && !line.startsWith('    ')) break
+        block.push(line)
+    }
+    const content = block.join('\n').trimEnd()
+    if (!/host:/.test(content) || !/username:/.test(content) || !/password:/.test(content)) {
+        throw new Error('Skyline Nacos 配置 database.chat-web-skyline 缺少连接字段')
+    }
+    return content
+}
+
+/** 已有 Hooks 配置缺少 Skyline 库时补上，已有节点不覆盖。 */
+function ensureSkylineDatabase(content, skylineConfig) {
+    if (content.includes('chat-web-skyline:')) return content
+    const block = skylineDatabaseBlock(skylineConfig)
+    if (/^database:/m.test(content)) return content.replace(/^database:\n/m, `database:\n${block}\n`)
+    return `${content.trimEnd()}\ndatabase:\n${block}\n`
+}
+
 function withPrefetchOne(rabbitmq) {
     if (/^\s+prefetch:/m.test(rabbitmq)) return rabbitmq.replace(/prefetch:\s*\d+/, 'prefetch: 1')
     return `${rabbitmq.trimEnd()}\n  prefetch: 1`
@@ -110,6 +137,7 @@ function validateHooksConfig(content) {
     if (!/^\s+port:\s*5110\s*$/m.test(content)) throw new Error('Hooks Nacos 配置缺少 server.port: 5110')
     if (!/^rabbitmq:/m.test(content) || !content.includes('/chat-sms')) throw new Error('Hooks Nacos 配置缺少 rabbitmq（vhost /chat-sms）')
     if (!content.includes('chat-web-srm:')) throw new Error('Hooks Nacos 配置缺少 database.chat-web-srm')
+    if (!content.includes('chat-web-skyline:')) throw new Error('Hooks Nacos 配置缺少 database.chat-web-skyline')
     if (!/prefetch:\s*1\b/.test(content)) throw new Error('Hooks RabbitMQ prefetch 必须为 1，回执要逐条写回')
     if (!content.includes('service_token:') || !content.includes('secret:')) throw new Error('Hooks Nacos 配置缺少网关凭据')
     return content
@@ -117,14 +145,19 @@ function validateHooksConfig(content) {
 
 async function ensureHooksConfig(environment = process.env) {
     const dataId = environment.NACOS_CONFIG_DATA_ID?.trim() || 'chat-web-hooks-service.yaml'
+    const skyline = await readConfig('chat-web-skyline-service.yaml', environment)
+    if (!skyline) throw new Error('未找到 chat-web-skyline-service.yaml，无法复制 database.chat-web-skyline')
     const existing = await readConfig(dataId, environment)
     if (existing) {
-        validateHooksConfig(existing)
-        return false
+        const updated = ensureSkylineDatabase(existing, skyline)
+        validateHooksConfig(updated)
+        if (updated !== existing) await writeConfig(dataId, updated, environment)
+        return updated !== existing
     }
     const source = await readConfig('chat-web-dispatch-service.yaml', environment)
     if (!source) throw new Error('未找到 chat-web-dispatch-service.yaml，无法复制网关和 RabbitMQ 配置')
-    await writeConfig(dataId, validateHooksConfig(createHooksConfig(source, environment)), environment)
+    const created = ensureSkylineDatabase(createHooksConfig(source, environment), skyline)
+    await writeConfig(dataId, validateHooksConfig(created), environment)
     return true
 }
 
@@ -188,4 +221,12 @@ if (require.main === module) {
     })
 }
 
-module.exports = { createHooksConfig, validateHooksConfig, ensureGatewayRoute, ensurePublicPath, HOOKS_PUBLIC_PATH }
+module.exports = {
+    createHooksConfig,
+    validateHooksConfig,
+    ensureGatewayRoute,
+    ensurePublicPath,
+    ensureSkylineDatabase,
+    skylineDatabaseBlock,
+    HOOKS_PUBLIC_PATH
+}

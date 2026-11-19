@@ -1,5 +1,11 @@
 # Hooks 部署变更记录
 
+## 2026-11-19：消费操作日志并写入 Skyline 库
+
+- 变更内容：Hooks 订阅 `chat.skyline.logger`，把操作日志写入 `tb_skyline_logger`。Nacos 增加 `database.chat-web-skyline`，从 Skyline 配置复制，Hooks 不建表。
+- 机器侧操作：部署脚本发现 Hooks 配置缺少该节点时自动补齐；已有节点不覆盖。
+- 回滚方法：回退 Hooks 镜像。日志队列会积压，不回写已有日志。
+
 ## 2026-10-28：回执接口改为 /observe/simbank/webhook
 
 - 变更内容：回执模块改名为 simbank，接口路径从 `POST /observe/receipt` 改为 `POST /observe/simbank/webhook`，旧路径移除。

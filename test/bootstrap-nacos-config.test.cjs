@@ -1,6 +1,12 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { createHooksConfig, validateHooksConfig, ensureGatewayRoute, ensurePublicPath } = require('../deploy/bootstrap-nacos-config.cjs')
+const {
+    createHooksConfig,
+    validateHooksConfig,
+    ensureGatewayRoute,
+    ensurePublicPath,
+    ensureSkylineDatabase
+} = require('../deploy/bootstrap-nacos-config.cjs')
 
 const source = `server:
   port: 5080
@@ -21,7 +27,7 @@ redis:
 
 test('Hooks Nacos 配置包含 5110 和 /chat-sms RabbitMQ，包含 SRM 库连接和 prefetch 1，不包含回执密钥和 Redis', () => {
     const content = createHooksConfig(source, { HOOKS_MYSQL_PASSWORD: 'db-pass' })
-    validateHooksConfig(content)
+    assert.throws(() => validateHooksConfig(content), /chat-web-skyline/)
     assert.match(content, /port: 5110/)
     assert.doesNotMatch(content, /^simbank:/m)
     assert.match(content, /vhost: \/chat-sms/)
@@ -29,6 +35,15 @@ test('Hooks Nacos 配置包含 5110 和 /chat-sms RabbitMQ，包含 SRM 库连�
     assert.match(content, /username: "chat_web_hooks_service"/)
     assert.doesNotMatch(content, /redis:/)
     assert.match(content, /database: "chat-web-srm"/)
+})
+
+test('已有 Hooks 配置缺少 Skyline 库时补上，已有节点不覆盖', () => {
+    const skyline = `database:\n  chat-web-skyline:\n    host: "mysql"\n    database: "chat-web-skyline"\n    username: "skyline"\n    password: "secret"\n`
+    const existing = createHooksConfig(source, { HOOKS_MYSQL_PASSWORD: 'db-pass' })
+    const updated = ensureSkylineDatabase(existing, skyline)
+    validateHooksConfig(updated)
+    assert.match(updated, /chat-web-skyline:\n    host: "mysql"/)
+    assert.equal(ensureSkylineDatabase(updated, skyline), updated)
 })
 
 test('来源缺少 rabbitmq 或配置缺少数据库时失败', () => {

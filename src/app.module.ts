@@ -4,19 +4,26 @@ import { APP_GUARD } from '@nestjs/core'
 import { AuthorizationGuard, AuthorizationModule, GatewayPrincipalGuard, GatewayPrincipalModule } from '@wlisfes/chat-web-base-schema/auth'
 import { HttpResponseModule } from '@wlisfes/chat-web-base-schema/interceptor'
 import { forRootNacosRuntimeOptions, NacosModule } from '@wlisfes/chat-web-base-schema/nacos'
-import { RabbitmqModule, setupSimbankWebhookTopology, setupSrmUserBillingTopology } from '@wlisfes/chat-web-base-schema/rabbitmq'
+import {
+    RabbitmqModule,
+    setupSimbankWebhookTopology,
+    setupSkylineLoggerTopology,
+    setupSrmUserBillingTopology
+} from '@wlisfes/chat-web-base-schema/rabbitmq'
 import type { ConfirmChannel } from 'amqplib'
 import { AppController } from '@/app.controller'
 import { AppService } from '@/app.service'
 import { DatabaseModule } from '@/database/database.module'
 import { HealthModule } from '@/health/health.module'
 import { HOOKS_RABBITMQ_VHOST } from '@/modules/simbank/simbank.constants'
+import { HooksLoggerModule } from '@/modules/logger/logger.module'
 import { SimbankModule } from '@/modules/simbank/simbank.module'
 
 /** 回执入队后由本服务串行写回发送状态，并带上原来绑在写回上的供应商计费事件。 */
 async function setupHooksTopology(channel: ConfirmChannel): Promise<void> {
     await setupSimbankWebhookTopology(channel)
     await setupSrmUserBillingTopology(channel)
+    await setupSkylineLoggerTopology(channel)
 }
 
 /** 回执接收服务：接收设备回执后入队，再逐条写回发送状态。 */
@@ -30,7 +37,8 @@ async function setupHooksTopology(channel: ConfirmChannel): Promise<void> {
         GatewayPrincipalModule,
         AuthorizationModule,
         HealthModule,
-        SimbankModule
+        SimbankModule,
+        HooksLoggerModule
     ],
     controllers: [AppController],
     providers: [

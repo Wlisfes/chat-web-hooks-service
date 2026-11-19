@@ -8,7 +8,7 @@
 | HTTP 端口              | `5110`（主机只绑定 `127.0.0.1`；Observe 经 Docker 网络访问） |
 | Nacos Data ID / 服务名 | `chat-web-hooks-service.yaml` / `chat-web-hooks-service` |
 | RabbitMQ               | 虚拟主机 `/chat-sms`，发布到 `chat.sms.simbank.webhook.exchange`   |
-| 数据库                 | 不连接                                                   |
+| 数据库                 | `chat-web-srm` 写回执；`chat-web-skyline` 写操作日志，不建表 |
 | 部署目录               | `/opt/chat-web-hooks-service`                            |
 
 ## 职责

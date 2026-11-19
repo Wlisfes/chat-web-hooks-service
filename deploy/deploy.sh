@@ -32,7 +32,7 @@ until docker pull "$IMAGE"; do
     attempt=$((attempt + 1))
 done
 
-# 部署前授权写回发送记录，并准备 Nacos 配置。已有配置只校验，不覆盖人工修改。
+# 部署前授权写回发送记录，并准备 Nacos 配置。已有配置缺少 Skyline 库时补齐，其他人工修改不覆盖。
 script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 export HOOKS_MYSQL_PASSWORD_FILE="$script_dir/.hooks-mysql-password"
 sh "$script_dir/bootstrap-database.sh"
